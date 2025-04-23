@@ -2,10 +2,22 @@
 
 ## Running the API
 
+The simplest way to run the API is using the run script:
+
 ```bash
-go mod tidy
-go run main.go
+# Development mode
+./run.sh
+
+# Production mode
+./run.sh --prod
 ```
+
+Alternatively, you can run it directly:
+
+```bash
+go run cmd/hookstorm/main.go
+```
+
 
 ## Configuration
 
@@ -17,7 +29,7 @@ Hookstorm supports the following env variables:
 
 Example:
 ```bash
-WEBHOOK_EXPIRY_SECONDS=3600 PORT=9000 go run main.go
+WEBHOOK_EXPIRY_SECONDS=3600 PORT=9000 go run cmd/hookstorm/main.go
 ```
 
 ## API Endpoints

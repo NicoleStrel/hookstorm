@@ -8,33 +8,19 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/hookstorm/backend/config"
 	"github.com/hookstorm/backend/handlers"
+	"github.com/hookstorm/backend/router"
 )
 
 func main() {
 	cfg := config.LoadConfig()
 	log.Printf("Webhook expiry set to %d seconds", cfg.WebhookExpirySeconds)
-	handlers.InitHandlers(cfg)
+	handlers.Setup(cfg)
 
 	if os.Getenv("GIN_MODE") == "release" {
 		gin.SetMode(gin.ReleaseMode)
 	}
 
-	r := gin.Default()
-
-	// API routes
-	api := r.Group("/api")
-	{
-		endpoints := api.Group("/endpoints")
-		{
-			endpoints.POST("", handlers.CreateEndpoint)
-			endpoints.GET("/:id", handlers.GetEndpoint)
-			endpoints.GET("/:id/events", handlers.ListEvents)
-			endpoints.POST("/:id/events/:event_id/replay", handlers.ReplayEvent)
-		}
-	}
-
-	// Webhook receiver route
-	r.Any("/hook/:id", handlers.ReceiveWebhook)
+	r := router.SetupRouter()
 
 	port := os.Getenv("PORT")
 	if port == "" {

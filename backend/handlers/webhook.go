@@ -1,5 +1,4 @@
 // Package handlers provides HTTP request handlers for the hookstorm webhook API.
-// It implements endpoints for creating, retrieving, and interacting with webhooks.
 package handlers
 
 import (
@@ -7,57 +6,9 @@ import (
 	"net/url"
 
 	"github.com/gin-gonic/gin"
-	"github.com/hookstorm/backend/config"
-	"github.com/hookstorm/backend/models"
-	"github.com/hookstorm/backend/storage"
+	"github.com/hookstorm/backend/internal/storage"
 	"github.com/hookstorm/backend/utils"
 )
-
-var appConfig config.Config
-
-// InitHandlers initializes the handlers with application configuration.
-func InitHandlers(cfg config.Config) {
-	appConfig = cfg
-}
-
-// CreateEndpoint creates a new webhook endpoint.
-// It accepts a name and optional TTL (expiry time) in seconds.
-// Returns the created endpoint with a unique URL.
-func CreateEndpoint(c *gin.Context) {
-	var req models.CreateEndpointRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-
-	expiresAt := utils.GetExpiryTime(appConfig.WebhookExpirySeconds, req.TTLSeconds)
-	endpoint := storage.CreateEndpoint(req.Name, expiresAt, req.TTLSeconds)
-
-	// Include the full URL in the response
-	endpoint.URL = utils.GetFullURL(c.Request, endpoint.ID)
-
-	c.JSON(http.StatusCreated, endpoint)
-}
-
-// GetEndpoint retrieves details for a specific webhook endpoint.
-// It accepts an endpoint ID as a parameter.
-// Returns 404 if the endpoint doesn't exist or 410 if it has expired.
-func GetEndpoint(c *gin.Context) {
-	id := c.Param("id")
-	endpoint, err := storage.GetEndpoint(id)
-	if err != nil {
-		if err.Error() == "endpoint has expired" {
-			c.JSON(http.StatusGone, gin.H{"error": "This webhook endpoint has expired"})
-			return
-		}
-		c.JSON(http.StatusNotFound, gin.H{"error": "Endpoint not found"})
-		return
-	}
-
-	endpoint.URL = utils.GetFullURL(c.Request, endpoint.ID)
-
-	c.JSON(http.StatusOK, endpoint)
-}
 
 // ListEvents lists all events received by a specific webhook endpoint.
 // It accepts an endpoint ID as a parameter.
@@ -87,18 +38,16 @@ func ReceiveWebhook(c *gin.Context) {
 		return
 	}
 
-	// Extract headers and query params
+	// Save the event
 	headers := c.Request.Header
 	queryParams := c.Request.URL.Query()
 
-	// Parse body
 	body, err := utils.ParseJSONBody(c.Request)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to read request body"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Could not parse request body"})
 		return
 	}
 
-	// Store the event
 	_, err = storage.SaveEvent(endpointID, headers, queryParams, body, c.Request.Method)
 	if err != nil {
 		if err.Error() == "endpoint has expired" {
@@ -169,8 +118,6 @@ func ReplayEvent(c *gin.Context) {
 		event.QueryParams,
 		event.Body,
 	)
-
-	// If successful, increment the replay count
 	if result.Success {
 		storage.IncrementReplayCount(eventID)
 	}

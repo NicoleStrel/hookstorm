@@ -22,8 +22,7 @@ Hookstorm requires [Go](https://go.dev/) version 1.21 and above
 **Backend:**
 ```bash
 cd backend
-go mod tidy
-go run main.go
+./run.sh
 ```
 
 **Frontend:**
@@ -44,24 +43,29 @@ This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENS
 ## Acknowledgements
 
 <div style="display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: flex-start;">
-  <div align="center">
-    <img src="https://go.dev/images/go-logo-blue.svg" alt="Go" width="50" height="50" style="filter: grayscale(100%)"/><br/>
-    <a href="https://github.com/golang/go"></a>
+  <div>
+    <a href="https://github.com/golang/go">
+      <img src="https://go.dev/images/go-logo-blue.svg" alt="Go" width="50" height="50" style="filter: grayscale(100%)"/>
+    </a>
   </div>
-  <div align="center">
-    <img src="https://raw.githubusercontent.com/gin-gonic/logo/master/color.png" alt="Gin" width="50" height="50" style="filter: grayscale(100%)"/><br/>
-    <a href="https://github.com/gin-gonic/gin"></a>
+  <div>
+    <a href="https://github.com/gin-gonic/gin">
+      <img src="https://raw.githubusercontent.com/gin-gonic/logo/master/color.png" alt="Gin" width="50" height="50" style="filter: grayscale(100%)"/>
+    </a>
   </div>
-  <div align="center">
-    <img src="https://assets.vercel.com/image/upload/v1662130559/nextjs/Icon_light_background.png" alt="Next.js" width="50" height="50" style="filter: grayscale(100%)"/><br/>
-    <a href="https://nextjs.org/"></a>
+  <div>
+    <a href="https://github.com/vercel/next.js">
+      <img src="https://assets.vercel.com/image/upload/v1662130559/nextjs/Icon_light_background.png" alt="Next.js" width="50" height="50" style="filter: grayscale(100%)"/>
+    </a>
   </div>
-  <div align="center">
-    <img src="https://upload.wikimedia.org/wikipedia/commons/a/a7/React-icon.svg" alt="React" width="50" height="50" style="filter: grayscale(100%)"/><br/>
-    <a href="https://reactjs.org/"></a>
+  <div>
+    <a href="https://github.com/facebook/react">
+      <img src="https://upload.wikimedia.org/wikipedia/commons/a/a7/React-icon.svg" alt="React" width="50" height="50" style="filter: grayscale(100%)"/>
+    </a>
   </div>
-  <div align="center">
-    <img src="https://upload.wikimedia.org/wikipedia/commons/d/d5/Tailwind_CSS_Logo.svg" alt="TailwindCSS" width="50" height="50" style="filter: grayscale(100%)"/><br/>
-    <a href="https://tailwindcss.com/"></a>
+  <div>
+    <a href="https://github.com/tailwindlabs/tailwindcss">
+      <img src="https://upload.wikimedia.org/wikipedia/commons/d/d5/Tailwind_CSS_Logo.svg" alt="TailwindCSS" width="50" height="50" style="filter: grayscale(100%)"/>
+    </a>
   </div>
 </div>
