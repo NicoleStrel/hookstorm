@@ -21,7 +21,7 @@ export default function ExampleTabs({ examplePayload }: ExampleTabsProps) {
         <div className="text-sm">
           <h4 className="font-medium mb-2">Using cURL:</h4>
           <pre className="rounded bg-muted p-3 font-mono text-xs overflow-x-auto">
-            {`curl -X POST https://hookstorm.example.com/wh/ep_default \\
+            {`curl -X POST https://www.hookstorm.com/id \\
   -H "Content-Type: application/json" \\
   -d '${JSON.stringify(examplePayload)}'`}
           </pre>
@@ -43,7 +43,7 @@ jobs:
         with:
           script: |
             const payload = ${JSON.stringify(examplePayload, null, 2)};
-            await fetch('https://hookstorm.example.com/wh/ep_default', {
+            await fetch('https://www.hookstorm.com/id', {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
@@ -64,7 +64,7 @@ jobs:
             </li>
             <li>
               Enter the URL:{" "}
-              <code className="bg-muted px-1 py-0.5 rounded">https://hookstorm.example.com/wh/ep_default</code>
+              <code className="bg-muted px-1 py-0.5 rounded">https://www.hookstorm.com/id</code>
             </li>
             <li>
               Go to the "Headers" tab and add <code className="bg-muted px-1 py-0.5 rounded">Content-Type</code> with
@@ -84,7 +84,7 @@ jobs:
           <pre className="rounded bg-muted p-3 font-mono text-xs overflow-x-auto">
             {`// Using fetch (Node.js 18+)
 async function sendWebhook() {
-  const response = await fetch('https://hookstorm.example.com/wh/ep_default', {
+  const response = await fetch('https://www.hookstorm.com/id', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -108,7 +108,7 @@ sendWebhook();`}
             {`import requests
 import json
 
-url = "https://hookstorm.example.com/wh/ep_default"
+url = "https://www.hookstorm.com/id"
 payload = ${JSON.stringify(examplePayload, null, 2)}
 headers = {"Content-Type": "application/json"}
 

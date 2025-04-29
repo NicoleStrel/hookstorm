@@ -23,7 +23,7 @@ func SetupRouter() *gin.Engine {
 	}
 
 	// Webhook receiver route
-	r.Any("/hook/:id", handlers.ReceiveWebhook)
+	r.Any("/:id", handlers.ReceiveWebhook)
 
 	return r
 }

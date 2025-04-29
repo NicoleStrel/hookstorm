@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"path"
 	"time"
 
 	"github.com/hookstorm/backend/models"
@@ -22,13 +23,13 @@ func GetExpiryTime(defaultTTL, customTTL int) time.Time {
 }
 
 // GetFullURL constructs a full URL for a webhook endpoint path.
-func GetFullURL(req *http.Request, path string) string {
+func GetFullURL(req *http.Request, pathStr string) string {
 	scheme := "http"
 	if req.TLS != nil {
 		scheme = "https"
 	}
 	baseURL := fmt.Sprintf("%s://%s", scheme, req.Host)
-	return baseURL + path
+	return baseURL + path.Join("/", pathStr)
 }
 
 // ParseJSONBody attempts to parse the request body as JSON.

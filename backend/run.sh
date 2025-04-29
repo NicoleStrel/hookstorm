@@ -12,7 +12,7 @@ if [ "$1" == "-h" ] || [ "$1" == "--help" ]; then
 fi
 
 export PORT=${PORT:-8080}
-export WEBHOOK_EXPIRY_SECONDS=${WEBHOOK_EXPIRY_SECONDS:-86400}
+export WEBHOOK_EXPIRY_SECONDS=${WEBHOOK_EXPIRY_SECONDS:-4}
 
 if [ "$1" == "--prod" ]; then
   export GIN_MODE=release
