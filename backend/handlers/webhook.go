@@ -48,7 +48,7 @@ func ReceiveWebhook(c *gin.Context) {
 		return
 	}
 
-	_, err = storage.SaveEvent(endpointID, headers, queryParams, body, c.Request.Method)
+	_, err = storage.SaveEvent(endpointID, headers, queryParams, body, c.Request.Method, http.StatusOK)
 	if err != nil {
 		if err.Error() == "endpoint has expired" {
 			c.JSON(http.StatusGone, gin.H{"error": "This webhook endpoint has expired"})

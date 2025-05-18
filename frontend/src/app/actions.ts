@@ -1,5 +1,7 @@
 "use server"
 
+import { EndpointExpiredError, EndpointNotFoundError, ApiError } from "@/lib/errors"
+
 // Type definition for an endpoint
 type Endpoint = {
   id: string
@@ -33,6 +35,24 @@ const snakeToCamel = (str: string): string =>
       .replace('_', '')
   );
 
+/**
+ * Handle common API response status codes
+ * @param response The fetch Response object
+ * @throws Custom error types for known status codes
+ */
+const handleApiResponse = (response: Response): void => {
+  if (response.status === 410) {
+    throw new EndpointExpiredError()
+  }
+
+  if (response.status === 404) {
+    throw new EndpointNotFoundError()
+  }
+
+  if (!response.ok) {
+    throw new ApiError(`API request failed: ${response.statusText}`)
+  }
+}
 
 /**
  * Create a new webhook endpoint
@@ -50,9 +70,7 @@ export async function createEndpoint(name: string): Promise<Endpoint> {
       body: JSON.stringify({ name }),
     })
 
-    if (!response.ok) {
-      throw new Error(`Failed to create endpoint: ${response.statusText}`)
-    }
+    handleApiResponse(response)
 
     const data = await response.json();
     return toCamelCase(data);
@@ -73,12 +91,8 @@ export async function getEndpoint(id?: string): Promise<Endpoint | null> {
   }
   
   try {
-    // Call the existing API endpoint on port 8080
     const response = await fetch(`http://127.0.0.1:8080/api/endpoints/${id}`)
-
-    if (!response.ok) {
-      throw new Error(`Failed to get endpoint: ${response.statusText}`)
-    }
+    handleApiResponse(response)
 
     const data = await response.json();
     return toCamelCase(data);
@@ -95,12 +109,8 @@ export async function getEndpoint(id?: string): Promise<Endpoint | null> {
  */
 export async function getEvents(id: string): Promise<any[]> {
   try {
-    // Call the existing API endpoint on port 8000
     const response = await fetch(`http://127.0.0.1:8080/api/endpoints/${id}/events`)
-
-    if (!response.ok) {
-      throw new Error(`Failed to get events: ${response.statusText}`)
-    }
+    handleApiResponse(response)
 
     const data = await response.json();
     return toCamelCase(data);
@@ -118,14 +128,10 @@ export async function getEvents(id: string): Promise<any[]> {
  */
 export async function replayEvent(endpointId: string, eventId: string): Promise<{ success: boolean }> {
   try {
-    // Call the existing API endpoint on port 8000
     const response = await fetch(`http://127.0.0.1:8080/api/endpoints/${endpointId}/events/${eventId}/replay`, {
       method: "POST",
     })
-
-    if (!response.ok) {
-      throw new Error(`Failed to replay event: ${response.statusText}`)
-    }
+    handleApiResponse(response)
 
     return { success: true }
   } catch (error) {

@@ -66,7 +66,7 @@ func GetEndpoint(id string) (models.WebhookEndpoint, error) {
 // query parameters, body, and request method. Returns an error if the endpoint
 // doesn't exist or has expired.
 func SaveEvent(endpointID string, headers map[string][]string, queryParams map[string][]string,
-	body map[string]interface{}, method string) (models.WebhookEvent, error) {
+	body map[string]interface{}, method string, statusCode int) (models.WebhookEvent, error) {
 	mu.Lock()
 	defer mu.Unlock()
 
@@ -87,6 +87,7 @@ func SaveEvent(endpointID string, headers map[string][]string, queryParams map[s
 		Body:        body,
 		Method:      method,
 		ReplayCount: 0,
+		StatusCode:  statusCode,
 	}
 
 	// Save event

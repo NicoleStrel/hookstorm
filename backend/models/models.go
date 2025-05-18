@@ -25,6 +25,7 @@ type WebhookEvent struct {
 	Body        map[string]interface{} `json:"body"`
 	Method      string                 `json:"method"`
 	ReplayCount int                    `json:"replay_count"`
+	StatusCode  int                    `json:"status_code"`
 }
 
 // CreateEndpointRequest is used for creating a new webhook endpoint

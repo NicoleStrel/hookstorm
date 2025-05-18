@@ -5,29 +5,70 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Clock, RefreshCw, ChevronDown, Play } from "lucide-react"
-import { useToast } from "@/hooks/use-toast"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
-import { getEndpoint, getEvents, replayEvent } from "@/app/actions"
+import { getEndpoint, getEvents, replayEvent, createEndpoint } from "@/app/actions"
+import { EndpointExpiredError, EndpointNotFoundError } from "@/lib/errors"
+import { showNotification } from "@/lib/toast-utils"
+import { createNewEndpoint } from "@/lib/endpoint-utils"
 
 export default function EventsList() {
   const [endpoint, setEndpoint] = useState<any>(null)
   const [events, setEvents] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [replayingEvent, setReplayingEvent] = useState<string | null>(null)
-  const { toast } = useToast()
+  const [isCreating, setIsCreating] = useState(false)
+
+  const handleCreateEndpoint = async () => {
+    setIsCreating(true)
+    try {
+      await createNewEndpoint({
+        onSuccess: async (newEndpoint) => {
+          setEndpoint(newEndpoint)
+          // Get events for the new endpoint
+          const eventsData = await getEvents(newEndpoint.id)
+          setEvents(eventsData)
+        }
+      })
+    } finally {
+      setIsCreating(false)
+    }
+  }
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        // First get the endpoint
-        const endpointData = await getEndpoint()
-        setEndpoint(endpointData)
+        // Get endpoint from localStorage
+        const storedEndpoint = localStorage.getItem('webhookEndpoint')
+        if (!storedEndpoint) {
+          console.error("No endpoint data in localStorage")
+          setLoading(false)
+          return
+        }
 
-        // Then get the events for that endpoint
-        const eventsData = await getEvents(endpointData.id)
-        setEvents(eventsData)
+        const endpointData = JSON.parse(storedEndpoint)
+        
+        // Verify endpoint is still valid with backend
+        try {
+          await getEndpoint(endpointData.id)
+          setEndpoint(endpointData)
+
+          // Then get the events for that endpoint
+          const eventsData = await getEvents(endpointData.id)
+          setEvents(eventsData)
+        } catch (error) {
+          if (
+            error instanceof EndpointExpiredError ||
+            error instanceof EndpointNotFoundError
+          ) {
+            // Endpoint is expired or not found, create new one
+            await handleCreateEndpoint()
+          } else {
+            throw error // Re-throw other errors
+          }
+        }
       } catch (error) {
         console.error("Error fetching data:", error)
+        showNotification("fetchError")
       } finally {
         setLoading(false)
       }
@@ -37,18 +78,33 @@ export default function EventsList() {
 
     // Set up polling to refresh events every 5 seconds
     const interval = setInterval(async () => {
-      if (endpoint) {
-        try {
-          const eventsData = await getEvents(endpoint.id)
-          setEvents(eventsData)
-        } catch (error) {
+      const storedEndpoint = localStorage.getItem('webhookEndpoint')
+      if (!storedEndpoint) return
+
+      const endpointData = JSON.parse(storedEndpoint)
+      
+      try {
+        // Verify endpoint is still valid
+        await getEndpoint(endpointData.id)
+        
+        // Get events for the endpoint
+        const eventsData = await getEvents(endpointData.id)
+        setEvents(eventsData)
+      } catch (error) {
+        if (
+          error instanceof EndpointExpiredError ||
+          error instanceof EndpointNotFoundError
+        ) {
+          // Endpoint is expired or not found, create new one
+          await handleCreateEndpoint()
+        } else {
           console.error("Error refreshing events:", error)
         }
       }
     }, 5000)
 
     return () => clearInterval(interval)
-  }, [endpoint?.id])
+  }, [])  // Remove endpoint?.id from dependencies since we're using localStorage
 
   const handleReplayEvent = async (eventId: string) => {
     if (!endpoint) return
@@ -57,17 +113,9 @@ export default function EventsList() {
 
     try {
       await replayEvent(endpoint.id, eventId)
-
-      toast({
-        title: "Event replayed",
-        description: "The webhook event has been replayed successfully.",
-      })
+      showNotification("eventReplayed")
     } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to replay webhook event. Please try again.",
-        variant: "destructive",
-      })
+      showNotification("eventReplayError")
     } finally {
       setReplayingEvent(null)
     }
@@ -111,7 +159,7 @@ export default function EventsList() {
                       <Badge variant={event.statusCode >= 200 && event.statusCode < 300 ? "default" : "destructive"}>
                         {event.method}
                       </Badge>
-                      <CardTitle className="text-base">{event.payload?.event || "Unknown Event"}</CardTitle>
+                      <CardTitle className="text-base">{event.body?.event || "Unknown Event"}</CardTitle>
                     </div>
                     <div className="flex items-center gap-2">
                       <Badge variant="outline">{event.statusCode}</Badge>
@@ -124,14 +172,14 @@ export default function EventsList() {
                   </div>
                   <CardDescription className="flex items-center mt-1">
                     <Clock className="mr-1 h-3 w-3" />
-                    {new Date(event.timestamp).toLocaleString()}
+                    {new Date(event.receivedAt).toLocaleString()}
                   </CardDescription>
                 </CardHeader>
                 <CollapsibleContent>
                   <CardContent className="pt-0">
                     <div className="rounded-md bg-muted p-4">
                       <h4 className="mb-2 text-sm font-medium">Payload</h4>
-                      <pre className="text-xs overflow-auto max-h-60">{JSON.stringify(event.payload, null, 2)}</pre>
+                      <pre className="text-xs overflow-auto max-h-60">{JSON.stringify(event.body, null, 2)}</pre>
                     </div>
                     <div className="mt-4 rounded-md bg-muted p-4">
                       <h4 className="mb-2 text-sm font-medium">Headers</h4>

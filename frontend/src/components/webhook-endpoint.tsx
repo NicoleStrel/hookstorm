@@ -8,7 +8,9 @@ import { Copy, ExternalLink, ArrowRight, RefreshCw } from "lucide-react"
 import Link from "next/link"
 import { useToast } from "@/hooks/use-toast"
 import WaitingAnimation from "@/components/waiting-animation"
-import { createEndpoint, getEndpoint } from "@/app/actions"
+import { getEndpoint } from "@/app/actions"
+import { createNewEndpoint } from "@/lib/endpoint-utils"
+import { showNotification } from "@/lib/toast-utils"
 
 export default function WebhookEndpoint() {
   const [endpoint, setEndpoint] = useState<any>(null)
@@ -18,56 +20,110 @@ export default function WebhookEndpoint() {
   const [isCreating, setIsCreating] = useState(false)
   const { toast } = useToast()
 
-  useEffect(() => {
-    // Fetch the endpoint from the backend
-    const fetchEndpoint = async () => {
-      try {
-        const data = await getEndpoint()
-        setEndpoint(data)
-
-        // Check if the endpoint is expired
-        const now = new Date()
-        const expiry = new Date(data.expiresAt)
-        setIsExpired(now >= expiry)
-
-        setLoading(false)
-      } catch (error) {
-        console.error("Error fetching endpoint:", error)
-        // If there's no endpoint, we'll show the create button
-        setEndpoint(null)
-        setIsExpired(true)
+  const handleCreateEndpoint = async () => {
+    setIsCreating(true)
+    try {
+      await createNewEndpoint({
+        isInitialCreation: loading,
+        onSuccess: (newEndpoint) => {
+          setEndpoint(newEndpoint)
+          setIsExpired(false)
+        }
+      })
+    } finally {
+      setIsCreating(false)
+      if (loading) {
         setLoading(false)
       }
     }
+  }
 
-    fetchEndpoint()
+  useEffect(() => {
+    // Try to get endpoint from localStorage first
+    const storedEndpoint = localStorage.getItem('webhookEndpoint')
+    if (storedEndpoint) {
+      const parsedEndpoint = JSON.parse(storedEndpoint)
+      
+      // Verify endpoint is still valid with backend
+      const verifyEndpoint = async () => {
+        try {
+          await getEndpoint(parsedEndpoint.id)
+          // Endpoint is still valid
+          setEndpoint(parsedEndpoint)
+          setIsExpired(false)
+          setLoading(false)
+        } catch (error) {
+          if (
+            error instanceof Error &&
+            (error.message === "ENDPOINT_EXPIRED" || error.message === "ENDPOINT_NOT_FOUND")
+          ) {
+            // Endpoint is expired or not found, remove from localStorage and create new one
+            localStorage.removeItem('webhookEndpoint')
+            handleCreateEndpoint()
+          } else {
+            toast({
+              title: "Error",
+              description: "Failed to verify endpoint. Please try refreshing the page.",
+              variant: "destructive",
+            })
+            setLoading(false)
+          }
+        }
+      }
+
+      verifyEndpoint()
+      return
+    }
+
+    // If no endpoint in localStorage, create a new one
+    handleCreateEndpoint()
   }, [])
 
   useEffect(() => {
     if (!endpoint || isExpired) return
 
-    const interval = setInterval(() => {
-      const now = new Date()
-      const expiry = new Date(endpoint.expiresAt)
+    const interval = setInterval(async () => {
+      try {
+        // Verify endpoint is still valid
+        await getEndpoint(endpoint.id)
+        
+        const now = new Date()
+        const expiry = new Date(endpoint.expiresAt)
 
-      if (now >= expiry) {
-        setIsExpired(true)
-        setTimeRemaining("Expired")
-        clearInterval(interval)
-        return
-      }
+        if (now >= expiry) {
+          setIsExpired(true)
+          setTimeRemaining("Creating new endpoint...")
+          clearInterval(interval)
+          
+          // Automatically create new endpoint when expired
+          handleCreateEndpoint()
+          return
+        }
 
-      const diff = expiry.getTime() - now.getTime()
-      const hours = Math.floor(diff / (1000 * 60 * 60))
-      const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60))
-      const seconds = Math.floor((diff % (1000 * 60)) / 1000)
+        const diff = expiry.getTime() - now.getTime()
+        const hours = Math.floor(diff / (1000 * 60 * 60))
+        const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60))
+        const seconds = Math.floor((diff % (1000 * 60)) / 1000)
 
-      if (hours > 0) {
-        setTimeRemaining(`${hours}h ${minutes}m ${seconds}s`)
-      } else if (minutes > 0) {
-        setTimeRemaining(`${minutes}m ${seconds}s`)
-      } else {
-        setTimeRemaining(`${seconds}s`)
+        if (hours > 0) {
+          setTimeRemaining(`${hours}h ${minutes}m ${seconds}s`)
+        } else if (minutes > 0) {
+          setTimeRemaining(`${minutes}m ${seconds}s`)
+        } else {
+          setTimeRemaining(`${seconds}s`)
+        }
+      } catch (error) {
+        if (
+          error instanceof Error &&
+          (error.message === "ENDPOINT_EXPIRED" || error.message === "ENDPOINT_NOT_FOUND")
+        ) {
+          // Endpoint is expired or not found, create new one
+          setIsExpired(true)
+          setTimeRemaining("Creating new endpoint...")
+          clearInterval(interval)
+          
+          handleCreateEndpoint()
+        }
       }
     }, 1000)
 
@@ -76,10 +132,7 @@ export default function WebhookEndpoint() {
 
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text)
-    toast({
-      title: "Copied to clipboard",
-      description: "The content has been copied to your clipboard.",
-    })
+    showNotification("copiedToClipboard")
   }
 
   const copyCurlCommand = () => {
@@ -87,62 +140,31 @@ export default function WebhookEndpoint() {
   -H "Content-Type: application/json" \\
   -d '{"event": "test", "data": {"message": "Hello World"}}'`
     navigator.clipboard.writeText(curlCommand)
-    toast({
-      title: "Curl command copied",
-      description: "The curl command has been copied to your clipboard.",
-    })
+    showNotification("curlCommandCopied")
   }
 
-  const handleCreateNewEndpoint = async () => {
-    setIsCreating(true)
-
-    try {
-      // Call the server action that will call the backend API
-      const newEndpoint = await createEndpoint("Webhook Endpoint")
-
-      setEndpoint(newEndpoint)
-      setIsExpired(false)
-
-      toast({
-        title: "Endpoint created",
-        description: "Your new webhook endpoint has been created successfully.",
-      })
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to create webhook endpoint. Please try again.",
-        variant: "destructive",
-      })
-    } finally {
-      setIsCreating(false)
-    }
-  }
-
-  if (loading) {
+  if (loading || isCreating) {
     return null // The parent component will show a skeleton
   }
 
-  // If there's no endpoint or it's been deleted, show the create button
-  if (!endpoint || endpoint.status === "deleted") {
+  if (!endpoint) {
     return (
       <Card>
         <CardHeader>
-          <CardTitle>Create Webhook Endpoint</CardTitle>
-          <CardDescription>You don't have an active webhook endpoint</CardDescription>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle>Your Webhook Endpoint</CardTitle>
+              <CardDescription className="mt-1">
+                Creating new endpoint...
+              </CardDescription>
+            </div>
+            <Badge variant="secondary">Creating...</Badge>
+          </div>
         </CardHeader>
         <CardContent>
           <div className="flex flex-col items-center justify-center py-8">
-            <p className="text-muted-foreground font-medium">Create a new endpoint to start testing</p>
-            <Button className="mt-4" onClick={handleCreateNewEndpoint} disabled={isCreating}>
-              {isCreating ? (
-                <>
-                  <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
-                  Creating...
-                </>
-              ) : (
-                "Create New Endpoint"
-              )}
-            </Button>
+            <p className="text-muted-foreground font-medium">Creating new endpoint...</p>
+            <WaitingAnimation />
           </div>
         </CardContent>
       </Card>
@@ -156,8 +178,8 @@ export default function WebhookEndpoint() {
           <div>
             <CardTitle>Your Webhook Endpoint</CardTitle>
             <CardDescription className="mt-1">
-              {isExpired ? (
-                "This endpoint has expired"
+              {isCreating ? (
+                "Creating new endpoint..."
               ) : (
                 <>
                   Expires in: <span className="font-medium">{timeRemaining}</span>
@@ -165,7 +187,7 @@ export default function WebhookEndpoint() {
               )}
             </CardDescription>
           </div>
-          <Badge variant={isExpired ? "secondary" : "default"}>{isExpired ? "Inactive" : "Active"}</Badge>
+          <Badge variant={isExpired ? "secondary" : "default"}>{isExpired ? "Renewing..." : "Active"}</Badge>
         </div>
       </CardHeader>
       <CardContent>
@@ -173,33 +195,23 @@ export default function WebhookEndpoint() {
           <code className="relative rounded bg-muted px-[0.3rem] py-[0.2rem] font-mono text-sm flex-1 truncate">
             {endpoint.url}
           </code>
-          <Button variant="outline" size="icon" onClick={() => copyToClipboard(endpoint.url)} disabled={isExpired}>
+          <Button variant="outline" size="icon" onClick={() => copyToClipboard(endpoint.url)} disabled={isExpired || isCreating}>
             <Copy className="h-4 w-4" />
           </Button>
         </div>
 
         <div className="mt-6">
-          {isExpired ? (
+          {isCreating ? (
             <div className="flex flex-col items-center justify-center py-8">
-              <p className="text-muted-foreground font-medium">This webhook endpoint has expired</p>
-              <p className="mt-2 text-sm text-muted-foreground">Create a new endpoint to continue testing</p>
-              <Button className="mt-4" onClick={handleCreateNewEndpoint} disabled={isCreating}>
-                {isCreating ? (
-                  <>
-                    <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
-                    Creating...
-                  </>
-                ) : (
-                  "Create New Endpoint"
-                )}
-              </Button>
+              <p className="text-muted-foreground font-medium">Creating new endpoint...</p>
+              <WaitingAnimation />
             </div>
           ) : (
             <WaitingAnimation />
           )}
         </div>
 
-        {!isExpired && (
+        {!isExpired && !isCreating && endpoint && (
           <div className="mt-6 text-sm">
             <h3 className="font-medium mb-2">Try sending a request to your webhook URL:</h3>
             <div className="relative">
@@ -213,7 +225,7 @@ export default function WebhookEndpoint() {
                 size="icon" 
                 className="absolute top-2 right-2" 
                 onClick={copyCurlCommand}
-                disabled={isExpired}
+                disabled={isExpired || isCreating}
               >
                 <Copy className="h-4 w-4" />
               </Button>
