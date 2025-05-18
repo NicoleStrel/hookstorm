@@ -124,12 +124,17 @@ export async function getEvents(id: string): Promise<any[]> {
  * Replay an event
  * @param endpointId The ID of the endpoint
  * @param eventId The ID of the event to replay
+ * @param targetUrl The URL to replay the event to
  * @returns A success message
  */
-export async function replayEvent(endpointId: string, eventId: string): Promise<{ success: boolean }> {
+export async function replayEvent(endpointId: string, eventId: string, targetUrl: string): Promise<{ success: boolean }> {
   try {
     const response = await fetch(`http://127.0.0.1:8080/api/endpoints/${endpointId}/events/${eventId}/replay`, {
       method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ target_url: targetUrl }),
     })
     handleApiResponse(response)
 
