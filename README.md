@@ -1,5 +1,9 @@
 # Hookstorm
 
+<p align="left">
+  <img src="frontend/public/hookstorm.png" alt="Hookstorm Logo" width="200"/>
+</p>
+
 **Test your webhooks in the eye of the storm.**
 
 Hookstorm is a comprehensive webhook development and testing platform that allows developers to create temporary webhook endpoints, capture incoming payloads, inspect them in detail, and replay events to target URLs. Perfect for local development, integration testing, and debugging webhook-driven applications.
@@ -10,6 +14,12 @@ Hookstorm is a comprehensive webhook development and testing platform that allow
 - event inspection
 - event replay
 - modernized ui
+
+**Coming Soon: Advanced Testing Features**
+- Latency simulation and network condition testing
+- Configurable retry policies and failure scenarios
+- Payload manipulation and custom response generation
+- Rate limiting and throttling simulation
 
 ## Getting Started
 
