@@ -40,13 +40,13 @@ export default function Navbar() {
         <div className="flex flex-1 items-center justify-end space-x-4">
           <nav className="flex items-center space-x-2">
             <Button variant="outline" size="sm" asChild className="hidden sm:flex">
-              <a href="https://github.com/hookstorm/hookstorm" target="_blank" rel="noopener noreferrer" title="GitHub">
+              <a href="https://github.com/NicoleStrel/hookstorm" target="_blank" rel="noopener noreferrer" title="GitHub">
                 <Github className="h-4 w-4 mr-2" />
                 GitHub
               </a>
             </Button>
             <Button variant="outline" size="sm" asChild className="hidden sm:flex">
-              <a href="https://discord.gg/hookstorm" target="_blank" rel="noopener noreferrer" title="Discord">
+              <a href="https://discord.gg/2vpvnJQK" target="_blank" rel="noopener noreferrer" title="Discord">
                 <MessageSquare className="h-4 w-4 mr-2" />
                 Discord
               </a>
