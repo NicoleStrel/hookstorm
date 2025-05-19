@@ -1,5 +1,6 @@
 import Link from "next/link"
-import { Cloud, Github, MessageSquare } from "lucide-react"
+import Image from "next/image"
+import { Github, MessageSquare } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import MobileMenu from "@/components/mobile-menu"
 
@@ -20,8 +21,13 @@ export default function Navbar() {
       <div className="container flex h-16 items-center">
         <div className="mr-4 flex">
           <Link href="/" className="mr-6 flex items-center space-x-2">
-            <Cloud className="h-6 w-6 text-primary" />
-            <span className="font-bold text-xl">hookstorm</span>
+            <Image
+              src="/hookstorm.png"
+              alt="HookStorm Logo"
+              width={170}
+              height={170}
+              className="text-primary"
+            />
           </Link>
           <nav className="hidden md:flex items-center space-x-6 text-sm font-medium">
             {routes.map((route) => (

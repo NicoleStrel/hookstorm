@@ -24,10 +24,6 @@ export default function ExamplesPage() {
               Back to Endpoint
             </Link>
           </Button>
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">Send Webhook Examples</h1>
-            <p className="text-muted-foreground">Different ways to send webhook events to your endpoint</p>
-          </div>
         </div>
 
         <Card>

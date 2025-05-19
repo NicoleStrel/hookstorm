@@ -8,12 +8,12 @@ import { Copy, ExternalLink, ArrowRight, RefreshCw } from "lucide-react"
 import Link from "next/link"
 import { useToast } from "@/hooks/use-toast"
 import WaitingAnimation from "@/components/waiting-animation"
-import { getEndpoint } from "@/app/actions"
-import { createNewEndpoint } from "@/lib/endpoint-utils"
+import { getValidEndpoint } from "@/lib/endpoint-utils"
+import { Endpoint } from "@/lib/types"
 import { showNotification } from "@/lib/toast-utils"
 
 export default function WebhookEndpoint() {
-  const [endpoint, setEndpoint] = useState<any>(null)
+  const [endpoint, setEndpoint] = useState<Endpoint | null>(null)
   const [loading, setLoading] = useState(true)
   const [timeRemaining, setTimeRemaining] = useState("")
   const [isExpired, setIsExpired] = useState(false)
@@ -23,13 +23,9 @@ export default function WebhookEndpoint() {
   const handleCreateEndpoint = async () => {
     setIsCreating(true)
     try {
-      await createNewEndpoint({
-        isInitialCreation: loading,
-        onSuccess: (newEndpoint) => {
-          setEndpoint(newEndpoint)
-          setIsExpired(false)
-        }
-      })
+      const newEndpoint = await getValidEndpoint()
+      setEndpoint(newEndpoint)
+      setIsExpired(false)
     } finally {
       setIsCreating(false)
       if (loading) {
@@ -39,64 +35,27 @@ export default function WebhookEndpoint() {
   }
 
   useEffect(() => {
-    // Try to get endpoint from localStorage first
-    const storedEndpoint = localStorage.getItem('webhookEndpoint')
-    if (storedEndpoint) {
-      const parsedEndpoint = JSON.parse(storedEndpoint)
-      
-      // Verify endpoint is still valid with backend
-      const verifyEndpoint = async () => {
-        try {
-          await getEndpoint(parsedEndpoint.id)
-          // Endpoint is still valid
-          setEndpoint(parsedEndpoint)
-          setIsExpired(false)
-          setLoading(false)
-        } catch (error) {
-          if (
-            error instanceof Error &&
-            (error.message === "ENDPOINT_EXPIRED" || error.message === "ENDPOINT_NOT_FOUND")
-          ) {
-            // Endpoint is expired or not found, remove from localStorage and create new one
-            localStorage.removeItem('webhookEndpoint')
-            handleCreateEndpoint()
-          } else {
-            toast({
-              title: "Error",
-              description: "Failed to verify endpoint. Please try refreshing the page.",
-              variant: "destructive",
-            })
-            setLoading(false)
-          }
-        }
-      }
-
-      verifyEndpoint()
-      return
-    }
-
-    // If no endpoint in localStorage, create a new one
     handleCreateEndpoint()
   }, [])
 
   useEffect(() => {
-    if (!endpoint || isExpired) return
+    if (!endpoint || isExpired) {
+      return
+    }
 
     const interval = setInterval(async () => {
       try {
-        // Verify endpoint is still valid
-        await getEndpoint(endpoint.id)
+        // Use getValidEndpoint to verify and potentially refresh the endpoint
+        const validEndpoint = await getValidEndpoint(false)
+        setEndpoint(validEndpoint)
         
         const now = new Date()
-        const expiry = new Date(endpoint.expiresAt)
+        const expiry = new Date(validEndpoint.expiresAt)
 
         if (now >= expiry) {
           setIsExpired(true)
           setTimeRemaining("Creating new endpoint...")
           clearInterval(interval)
-          
-          // Automatically create new endpoint when expired
-          handleCreateEndpoint()
           return
         }
 
@@ -113,17 +72,10 @@ export default function WebhookEndpoint() {
           setTimeRemaining(`${seconds}s`)
         }
       } catch (error) {
-        if (
-          error instanceof Error &&
-          (error.message === "ENDPOINT_EXPIRED" || error.message === "ENDPOINT_NOT_FOUND")
-        ) {
-          // Endpoint is expired or not found, create new one
-          setIsExpired(true)
-          setTimeRemaining("Creating new endpoint...")
-          clearInterval(interval)
-          
-          handleCreateEndpoint()
-        }
+        console.error("Error checking endpoint:", error)
+        setIsExpired(true)
+        setTimeRemaining("Creating new endpoint...")
+        clearInterval(interval)
       }
     }, 1000)
 
@@ -136,6 +88,8 @@ export default function WebhookEndpoint() {
   }
 
   const copyCurlCommand = () => {
+    if (!endpoint) return // Add null check here
+    
     const curlCommand = `curl -X POST ${endpoint.url} \\
   -H "Content-Type: application/json" \\
   -d '{"event": "test", "data": {"message": "Hello World"}}'`

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -10,109 +10,111 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
-import { getEndpoint, getEvents, replayEvent } from "@/app/actions"
-import { EndpointExpiredError, EndpointNotFoundError } from "@/lib/errors"
+import { getEvents, replayEvent, getEndpoint } from "@/app/actions"
 import { showNotification } from "@/lib/toast-utils"
-import { createNewEndpoint } from "@/lib/endpoint-utils"
+import { getValidEndpoint } from "@/lib/endpoint-utils"
+import { Endpoint } from "@/lib/types"
+import { toast } from "sonner"
 
 export default function EventsList() {
-  const [endpoint, setEndpoint] = useState<any>(null)
+  const [endpoint, setEndpoint] = useState<Endpoint | null>(null)
   const [events, setEvents] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [replayingEvent, setReplayingEvent] = useState<string | null>(null)
-  const [isCreating, setIsCreating] = useState(false)
   const [showReplayDialog, setShowReplayDialog] = useState(false)
   const [targetUrl, setTargetUrl] = useState("")
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null)
   const [openCollapsibles, setOpenCollapsibles] = useState<Set<string>>(new Set())
+  const inFlightRequestRef = useRef<boolean>(false)
+  const endpointRef = useRef<Endpoint | null>(null)
 
-  const handleCreateEndpoint = async () => {
-    setIsCreating(true)
-    try {
-      await createNewEndpoint({
-        onSuccess: async (newEndpoint) => {
-          setEndpoint(newEndpoint)
-          // Get events for the new endpoint
-          const eventsData = await getEvents(newEndpoint.id)
-          setEvents(eventsData)
-        }
-      })
-    } finally {
-      setIsCreating(false)
-    }
-  }
-
+  // Initial endpoint fetch
   useEffect(() => {
+    let mounted = true
+
     const fetchData = async () => {
+      if (!mounted) return
+      
       try {
-        // Get endpoint from localStorage
-        const storedEndpoint = localStorage.getItem('webhookEndpoint')
-        if (!storedEndpoint) {
-          console.error("No endpoint data in localStorage")
-          setLoading(false)
-          return
-        }
-
-        const endpointData = JSON.parse(storedEndpoint)
+        const validEndpoint = await getValidEndpoint(false)
+        if (!mounted) return
         
-        // Verify endpoint is still valid with backend
-        try {
-          await getEndpoint(endpointData.id)
-          setEndpoint(endpointData)
+        setEndpoint(validEndpoint)
+        endpointRef.current = validEndpoint
 
-          // Then get the events for that endpoint
-          const eventsData = await getEvents(endpointData.id)
-          setEvents(eventsData)
-        } catch (error) {
-          if (
-            error instanceof EndpointExpiredError ||
-            error instanceof EndpointNotFoundError
-          ) {
-            // Endpoint is expired or not found, create new one
-            await handleCreateEndpoint()
-          } else {
-            throw error // Re-throw other errors
-          }
-        }
+        const eventsData = await getEvents(validEndpoint.id)
+        if (!mounted) return
+        
+        setEvents(eventsData)
       } catch (error) {
         console.error("Error fetching data:", error)
-        showNotification("fetchError")
+        if (mounted) {
+          showNotification("fetchError")
+        }
       } finally {
-        setLoading(false)
+        if (mounted) {
+          setLoading(false)
+        }
       }
     }
 
     fetchData()
 
-    // Set up polling to refresh events every 5 seconds
-    const interval = setInterval(async () => {
-      const storedEndpoint = localStorage.getItem('webhookEndpoint')
-      if (!storedEndpoint) return
+    return () => {
+      mounted = false
+    }
+  }, []) // Empty dependency array - only run once
 
-      const endpointData = JSON.parse(storedEndpoint)
-      
+  // Separate polling effect
+  useEffect(() => {
+    let mounted = true
+    let timeoutId: NodeJS.Timeout
+
+    const pollEvents = async () => {
+      // Don't poll if:
+      // 1. Component is unmounted
+      // 2. No endpoint
+      // 3. Request in flight
+      // 4. Currently replaying an event
+      if (!mounted || !endpointRef.current || inFlightRequestRef.current || replayingEvent) return
+
       try {
-        // Verify endpoint is still valid
-        await getEndpoint(endpointData.id)
+        inFlightRequestRef.current = true
         
-        // Get events for the endpoint
-        const eventsData = await getEvents(endpointData.id)
+        const verifiedEndpoint = await getEndpoint(endpointRef.current.id)
+        if (!mounted) return
+        
+        if (!verifiedEndpoint) {
+          return
+        }
+        
+        const eventsData = await getEvents(endpointRef.current.id)
+        if (!mounted) return
+        
         setEvents(eventsData)
       } catch (error) {
-        if (
-          error instanceof EndpointExpiredError ||
-          error instanceof EndpointNotFoundError
-        ) {
-          // Endpoint is expired or not found, create new one
-          await handleCreateEndpoint()
-        } else {
-          console.error("Error refreshing events:", error)
-        }
+        console.error("Error refreshing events:", error)
+      } finally {
+        inFlightRequestRef.current = false
       }
-    }, 5000)
+    }
 
-    return () => clearInterval(interval)
-  }, [])  // Remove endpoint?.id from dependencies since we're using localStorage
+    const startPolling = () => {
+      const poll = () => {
+        pollEvents()
+        timeoutId = setTimeout(poll, 5000)
+      }
+      
+      timeoutId = setTimeout(poll, 5000)
+    }
+
+    startPolling()
+
+    return () => {
+      mounted = false
+      clearTimeout(timeoutId)
+    }
+  }, [replayingEvent]) // Only depend on replayingEvent state
 
   const handleReplayClick = (eventId: string) => {
     setSelectedEventId(eventId)
@@ -128,10 +130,20 @@ export default function EventsList() {
     try {
       await replayEvent(endpoint.id, selectedEventId, targetUrl)
       showNotification("eventReplayed")
-      // Clear the target URL after successful replay
       setTargetUrl("")
+      
+      // Fetch events immediately after replay
+      const eventsData = await getEvents(endpoint.id)
+      setEvents(eventsData)
     } catch (error) {
-      showNotification("eventReplayError")
+      if (error instanceof Error && error.message === 'Invalid target URL provided. Please enter a valid URL.') {
+        setShowReplayDialog(true)
+        toast.error("Invalid URL", {
+          description: "Please enter a valid URL (e.g., https://example.com/webhook)"
+        })
+      } else {
+        showNotification("eventReplayError")
+      }
     } finally {
       setReplayingEvent(null)
       setSelectedEventId(null)

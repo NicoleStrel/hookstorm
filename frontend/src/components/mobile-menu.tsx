@@ -2,7 +2,8 @@
 
 import { useState } from "react"
 import Link from "next/link"
-import { Menu, Github, MessageSquare, Cloud } from "lucide-react"
+import Image from "next/image"
+import { Menu, Github, MessageSquare } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
 import { usePathname } from "next/navigation"
@@ -29,8 +30,13 @@ export default function MobileMenu({ routes }: MobileMenuProps) {
       </SheetTrigger>
       <SheetContent side="left" className="pr-0">
         <Link href="/" className="flex items-center space-x-2" onClick={() => setOpen(false)}>
-          <Cloud className="h-6 w-6 text-primary" />
-          <span className="font-bold text-xl">hookstorm</span>
+          <Image
+            src="/hookstorm.png"
+            alt="HookStorm Logo"
+            width={170}
+            height={170}
+            className="text-primary"
+          />
         </Link>
         <div className="my-6 w-full">
           <nav className="flex flex-col space-y-4">
